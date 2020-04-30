@@ -1,56 +1,76 @@
-install.packages("dplyr")
-library(dplyr)
+#reading files
 
-#reading data
-X_train <- read.table("./UCI HAR Dataset/train/X_train.txt")
+dataActivityTest  <- read.table(file.path(path_rf, "test" , "Y_test.txt" ),header = FALSE)
 
-Y_train <- read.table("./UCI HAR Dataset/train/Y_train.txt")
+dataActivityTrain <- read.table(file.path(path_rf, "train", "Y_train.txt"),header = FALSE)
 
-Sub_train <- read.table("./UCI HAR Dataset/train/subject_train.txt")
+dataSubjectTrain <- read.table(file.path(path_rf, "train", "subject_train.txt"),header = FALSE)
 
-X_test <- read.table("./UCI HAR Dataset/test/X_test.txt")
+dataSubjectTest  <- read.table(file.path(path_rf, "test" , "subject_test.txt"),header = FALSE)
 
-Y_test <- read.table("./UCI HAR Dataset/test/Y_test.txt")
+dataFeaturesTest  <- read.table(file.path(path_rf, "test" , "X_test.txt" ),header = FALSE)
 
-Sub_test <- read.table("./UCI HAR Dataset/test/subject_test.txt")
-
-variable_names <- read.table("./UCI HAR Dataset/features.txt")
-
-activity_labels <- read.table("./UCI HAR Dataset/activity_labels.txt")
+dataFeaturesTrain <- read.table(file.path(path_rf, "train", "X_train.txt"),header = FALSE)
 
 #1.Merge
 
-X_total <- rbind(X_train, X_test)
+dataSubject <- rbind(dataSubjectTrain, dataSubjectTest)
 
-Y_total <- rbind(Y_train, Y_test)
+dataActivity<- rbind(dataActivityTrain, dataActivityTest)
 
-Sub_total <- rbind(Sub_train, Sub_test)
+dataFeatures<- rbind(dataFeaturesTrain, dataFeaturesTest)
 
-#2.mean and std
+names(dataSubject)<-c("subject")
 
-selected_var <- variable_names[grep("mean\\(\\)|std\\(\\)",variable_names[,2]),]
+names(dataActivity)<- c("activity")
 
-X_total <- X_total[,selected_var[,1]]
+dataFeaturesNames <- read.table(file.path(path_rf, "features.txt"),head=FALSE)
 
-#3.descriptive activity
+names(dataFeatures)<- dataFeaturesNames$V2
 
-colnames(Y_total) <- "activity"
+dataCombine <- cbind(dataSubject, dataActivity)
 
-Y_total$activitylabel <- factor(Y_total$activity, labels = as.character(activity_labels[,2]))
+Data <- cbind(dataFeatures, dataCombine)
 
-activitylabel <- Y_total[,-1]
-
-4.labels
-
-colnames(X_total) <- variable_names[selected_var[,1],2]
-
-5.tidy data
-
-colnames(Sub_total) <- "subject"
-
-total <- cbind(X_total, activitylabel, Sub_total)
+#2.Extract mean and std
 
 
-total_mean <- total %>% group_by(activitylabel, subject) %>% summarize_each(funs(mean))
+subdataFeaturesNames<-dataFeaturesNames$V2[grep("mean\\(\\)|std\\(\\)", dataFeaturesNames$V2)]
 
-write.table(total_mean, file = "./UCI HAR Dataset/tidydata.txt", row.names = FALSE, col.names = TRUE)
+selectedNames<-c(as.character(subdataFeaturesNames), "subject", "activity" )
+
+Data<-subset(Data,select=selectedNames)
+
+str(Data)
+
+#3.Name activities in dataset
+
+activityLabels <- read.table(file.path(path_rf, "activity_labels.txt"),header = FALSE)
+
+head(Data$activity,30)
+
+#4.label dataset using descriptive variable names
+
+names(Data)<-gsub("^t", "time", names(Data))
+
+names(Data)<-gsub("^f", "frequency", names(Data))
+
+names(Data)<-gsub("Acc", "Accelerometer", names(Data))
+
+names(Data)<-gsub("Gyro", "Gyroscope", names(Data))
+
+names(Data)<-gsub("Mag", "Magnitude", names(Data))
+
+names(Data)<-gsub("BodyBody", "Body", names(Data))
+
+names(Data)
+
+#5.Second independant tidy data set
+
+library(plyr);
+
+Data2<-aggregate(. ~subject + activity, Data, mean)
+
+Data2<-Data2[order(Data2$subject,Data2$activity),]
+
+write.table(Data2, file = "tidydata.txt",row.name=FALSE)
